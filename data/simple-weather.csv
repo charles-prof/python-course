@@ -1,0 +1,8 @@
+date,temperature_max,temperature_min,humidity,precipitation,wind_speed,weather
+2024-06-10,39,28,45,0.0,12,Sunny
+2024-06-11,38,27,48,0.0,10,Sunny
+2024-06-12,37,26,50,0.2,8,Partly Cloudy
+2024-06-13,36,26,55,1.0,7,Cloudy
+2024-06-14,35,25,60,5.0,9,Rain
+2024-06-15,34,25,65,10.0,11,Thunderstorm
+2024-06-16,36,26,58,0.5,10,Partly Cloudy

@@ -1,95 +1,102 @@
-# Sample input data for the forest fire cellular automaton
-# Each cell is either:
-# 0 - EMPTY (black), 1 - TREE (green), 2 - FIRE (red)
-# This is a small 5x5 grid for demonstration.
-
 import numpy as np
 import matplotlib.pyplot as plt
-import matplotlib.animation as animation
 import matplotlib.colors as mcolors
+import random
+import time
+from IPython.display import display, clear_output
 
-sample_forest = np.array([
-    [0, 1, 1, 1, 0],
-    [1, 1, 2, 1, 1],
-    [1, 2, 1, 2, 1],
-    [1, 1, 2, 1, 1],
-    [0, 1, 1, 1, 0]
-])
+# --- Configuration ---
+GRID_SIZE = 50
+TREE_DENSITY = 0.7
+P_LIGHTNING = 0.00005
+P_SPREAD = 0.1
 
-# Forest Fire Cellular Automaton Implementation
+EMPTY = 0
+TREE = 1
+BURNING = 2
 
-# Parameters
-size = 50  # Grid size
-p_tree = 0.6  # Probability of a tree
-p_fire = 0.001  # Probability of spontaneous fire
-frames = 100  # Number of frames
-
-# States
-EMPTY, TREE, FIRE = 0, 1, 2
-
-def init_forest(size, p_tree):
-    """
-    Initialize the forest grid with trees and empty cells.
-    The center cell is set on fire.
-    """
-    forest = np.random.choice([EMPTY, TREE], size=(size, size), p=[1-p_tree, p_tree])
-    forest[size//2, size//2] = FIRE  # Ignite the center
-    return forest
-
-def get_neighbors(grid, x, y):
-    """
-    Get the 8 neighbors of cell (x, y) in the grid.
-    Handles edge cases by limiting indices.
-    """
-    neighbors = []
-    for dx in [-1, 0, 1]:
-        for dy in [-1, 0, 1]:
-            if dx == 0 and dy == 0:
-                continue  # Skip the cell itself
-            nx, ny = x + dx, y + dy
-            if 0 <= nx < grid.shape[0] and 0 <= ny < grid.shape[1]:
-                neighbors.append(grid[nx, ny])
-    return neighbors
-
-def ca_step(forest):
-    """
-    Perform one step of the cellular automaton.
-    Rules:
-    - A TREE becomes FIRE if at least one neighbor is FIRE or with probability p_fire.
-    - A FIRE becomes EMPTY.
-    - EMPTY remains EMPTY.
-    """
-    new_forest = forest.copy()
-    for i in range(forest.shape[0]):
-        for j in range(forest.shape[1]):
-            cell = forest[i, j]
-            if cell == TREE:
-                neighbors = get_neighbors(forest, i, j)
-                if FIRE in neighbors or np.random.rand() < p_fire:
-                    new_forest[i, j] = FIRE
-            elif cell == FIRE:
-                new_forest[i, j] = EMPTY
-            # EMPTY stays EMPTY
-    return new_forest
-
-# Visualization setup
-cmap = mcolors.ListedColormap(['black', 'green', 'red'])
-bounds = [EMPTY, TREE, FIRE, FIRE+1]
+colors = ['black', 'green', 'red']
+cmap = mcolors.ListedColormap(colors)
+bounds = [-0.5, 0.5, 1.5, 2.5]
 norm = mcolors.BoundaryNorm(bounds, cmap.N)
 
-forest = init_forest(size, p_tree)
-fig, ax = plt.subplots()
-im = ax.imshow(forest, cmap=cmap, norm=norm)
-ax.axis('off')
+def initialize_forest(grid_size, tree_density):
+    # The forest is a grid where each cell is either empty or has a tree.
+    # In the beginning, the forest is peaceful and green.
+    forest = np.random.choice([EMPTY, TREE], size=(grid_size, grid_size),
+                              p=[1 - tree_density, tree_density])
+    return forest
 
-def update(frame):
-    """
-    Animation update function for each frame.
-    """
-    global forest
-    forest = ca_step(forest)
-    im.set_data(forest)
-    return [im]
+def update_forest(forest):
+    # Each step, the fire spreads, trees may ignite from lightning, and burned trees become empty.
+    new_forest = np.copy(forest)
+    rows, cols = forest.shape
+    for r in range(rows):
+        for c in range(cols):
+            current_state = forest[r, c]
+            if current_state == EMPTY:
+                new_forest[r, c] = EMPTY  # Ashes remain where fire once raged.
+            elif current_state == BURNING:
+                new_forest[r, c] = EMPTY  # Trees that burned down leave empty ground.
+            elif current_state == TREE:
+                # Sometimes, a bolt of lightning strikes, igniting a tree.
+                if random.random() < P_LIGHTNING:
+                    new_forest[r, c] = BURNING
+                    continue
+                fire_nearby = False
+                for dr in [-1, 0, 1]:
+                    for dc in [-1, 0, 1]:
+                        if dr == 0 and dc == 0:
+                            continue
+                        nr, nc = r + dr, c + dc
+                        if 0 <= nr < rows and 0 <= nc < cols:
+                            if forest[nr, nc] == BURNING:
+                                fire_nearby = True
+                                break
+                    if fire_nearby:
+                        break
+                # If fire is nearby, the tree may catch fire.
+                if fire_nearby:
+                    new_forest[r, c] = BURNING
+                else:
+                    new_forest[r, c] = TREE
+    return new_forest
 
-ani = animation.FuncAnimation(fig, update, frames=frames, interval=100, blit=True)
-plt.show()
+def simulate_forest_fire(generations=100):
+    # The story begins: a dense forest, full of life.
+    forest = initialize_forest(GRID_SIZE, TREE_DENSITY)
+    fig, ax = plt.subplots(figsize=(6, 6))
+    img = ax.imshow(forest, cmap=cmap, norm=norm, interpolation='nearest')
+    ax.set_title("Forest Fire Simulation")
+    ax.set_xticks([])
+    ax.set_yticks([])
+
+    for gen in range(generations):
+        forest = update_forest(forest)
+        img.set_data(forest)
+        ax.set_title(f"Forest Fire Simulation - Generation {gen+1}/{generations}")
+        display(fig)
+        clear_output(wait=True)
+        time.sleep(0.05)
+        # The fire may die out, or the forest may be reduced to ashes.
+        if not np.any(forest == BURNING) and not np.any(forest == TREE):
+            print(f"Simulation ended early at generation {gen+1}: All trees have burned or no trees left to burn.")
+            break
+        elif not np.any(forest == BURNING) and P_LIGHTNING == 0:
+            print(f"Simulation ended early at generation {gen+1}: All fire has died out and no new lightning strikes possible.")
+            break
+    plt.show()  # Show the final frame
+
+def replay_simulation():
+    # The forest can regrow, and the story can begin anew.
+    while True:
+        simulate_forest_fire(generations=200)
+        print("\nSimulation complete!")
+        replay = input("Replay the simulation? (y/n): ").strip().lower()
+        if replay != 'y':
+            print("Thank you for watching the story of the forest.")
+            break
+
+if __name__ == "__main__":
+    # The cycle of fire and regrowth continues as long as you wish.
+    replay_simulation()
